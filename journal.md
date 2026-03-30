@@ -38,6 +38,9 @@
 | AD-16 | Architecture Decision | Annotated every file in folder structure with one-line description | Planning | Mar 28 |
 | AD-17 | Architecture Decision | Wrote function reference before writing any code | Planning | Mar 28 |
 | AD-18 | Architecture Decision | Two Mermaid diagrams — system diagram and call flow diagram | Planning | Mar 28 |
+| AD-19 | Architecture Decision | Plan to replace rigid Phase 1 tools with a single dynamic query_compounds tool in Phase 2 | Phase 2 (planned) | Mar 29 |
+| AD-20 | Architecture Decision | Cascading filter architecture for multi-database, role-based tool routing | Planning | Mar 29 |
+| LRN-01 | Learning | How MCP works, why it beats having an LLM write queries directly, and how we plan to make tools more dynamic | Phase 1 | Mar 29 |
 
 ---
 
@@ -278,6 +281,137 @@ curl "https://www.ebi.ac.uk/chembl/api/data/molecule/CHEMBL121.json" | python3 -
 
 ---
 
+### [AD-19] Plan to replace rigid Phase 1 tools with a single dynamic query_compounds tool in Phase 2
+
+**Date:** March 29, 2026
+**Phase:** 2 (planned)
+**Chose:** In Phase 2, replace `search_by_target` and `filter_by_affinity` with a single tool called `query_compounds` that accepts a dynamic set of optional filter and sort parameters
+**Alternative:** Keep adding more rigid tools for each new query type (one tool per filter combination)
+**Why:** The Phase 1 tools have hardcoded fields. `filter_by_affinity` only filters by `pchembl_value`. There is no way to ask "show me lightweight non-withdrawn PPARG compounds sorted by approval year" without writing a new tool specifically for that combination. That approach doesn't scale — a real research tool could need hundreds of query combinations. The dynamic tool approach solves this with one tool that covers all of them.
+
+**How it will be built:**
+
+The tool definition sent to the Anthropic API will include every filterable field as an optional parameter in the input schema:
+
+```javascript
+{
+  name: "query_compounds",
+  description: "Query the compound database with any combination of filters. Only include parameters relevant to what the user asked — omit everything else.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      target:            { type: "string", enum: ["PPARG", "AR"] },
+      min_pchembl:       { type: "number" },
+      max_pchembl:       { type: "number" },
+      min_mol_weight:    { type: "number" },
+      max_mol_weight:    { type: "number" },
+      max_phase:         { type: "number" },
+      withdrawn_flag:    { type: "boolean" },
+      name_starts_with:  { type: "string" },
+      sort_by:           { type: "string", enum: ["pchembl_value", "mol_weight", "first_approval"] },
+      sort_order:        { type: "string", enum: ["asc", "desc"] },
+      limit:             { type: "number" }
+    }
+  }
+}
+```
+
+The LLM reads this schema and decides which parameters to include based on the user's question. Parameters the user didn't ask about are omitted entirely.
+
+The handler function builds the MongoDB query object dynamically — only adding a condition for each parameter that was actually provided:
+
+```javascript
+function queryCompounds(input) {
+  const query = {}
+  const options = {}
+
+  if (input.target)            query.target_protein = input.target
+  if (input.min_pchembl)       query.pchembl_value = { $gte: input.min_pchembl }
+  if (input.max_pchembl)       query.pchembl_value = { ...query.pchembl_value, $lte: input.max_pchembl }
+  if (input.min_mol_weight)    query.mol_weight = { $gte: input.min_mol_weight }
+  if (input.max_mol_weight)    query.mol_weight = { ...query.mol_weight, $lte: input.max_mol_weight }
+  if (input.max_phase !== undefined)      query.max_phase = input.max_phase
+  if (input.withdrawn_flag !== undefined) query.withdrawn_flag = input.withdrawn_flag
+  if (input.name_starts_with)  query.name = { $regex: `^${input.name_starts_with}`, $options: 'i' }
+
+  if (input.sort_by) options.sort = { [input.sort_by]: input.sort_order === 'asc' ? 1 : -1 }
+  options.limit = input.limit || 10
+
+  return db.compounds.find(query, options)
+}
+```
+
+No LLM runs inside this function. The LLM's job was to produce the input JSON. This function's job is to translate that JSON into a MongoDB query. Each `if` statement corresponds to one optional WHERE condition. If the LLM didn't include a parameter, its `if` block doesn't run and that condition is never added to the query.
+
+**Adding support for a new field** requires three changes: add it to the input schema definition, add one `if` block in `queryCompounds`, and MongoDB handles the rest. No new tools, no new endpoints.
+
+**Interview line:** "The Phase 1 tools are intentionally rigid to demonstrate the concept. In Phase 2 I replaced them with a single dynamic tool that builds MongoDB filter objects from whatever parameters the LLM provides — the equivalent of a dynamic SQL WHERE clause builder. Adding a new filterable field is a five-line change."
+
+---
+
+### [AD-20] Cascading filter architecture for multi-database, role-based tool routing
+
+**Date:** March 29, 2026
+**Phase:** Planning (future expansion beyond Phase 1)
+**Chose:** A cascading filter architecture that narrows the tool set at each stage — role, table selection, tool scoping — so the LLM never sees more than 5–10 tools regardless of total system size
+
+**Alternative:** Flat tool list that grows with every new table and data source, with the LLM selecting from the full set every time
+
+**Why:** LLM tool-selection accuracy degrades past roughly 15–20 tool definitions. A system with 200 tables and 3–5 tools per table would put 600–1000 tools in front of the LLM on every query — burning tokens, slowing responses, and increasing the chance of incorrect tool selection. The cascading filter solves this by reducing the tool set before the LLM ever sees it.
+
+**The cascade has three stages:**
+
+1. **Role filter** — on authentication, the user's role (scientist, business, admin) determines which databases and tables they can access. Tools for inaccessible tables are never loaded. This is both a performance optimization and a security boundary — the LLM cannot call tools it was never given.
+
+2. **Table selection** — the user's query is matched against plain-English descriptions of the remaining tables. For small numbers of tables (under ~15), the LLM can read the descriptions directly and pick. At larger scale, vector similarity search pre-filters thousands of table descriptions down to 2–3 candidates, then the LLM picks from those. This is the two-stage retrieval pattern used in production RAG systems.
+
+3. **Tool scoping** — each table has a hardcoded set of tools that fit its schema. Once the table is selected, only that table's tools are sent to the Anthropic API. The LLM chooses from 3–5 tools, not hundreds.
+
+**Layer structure:**
+
+```
+User query
+    │
+    ▼
+┌─────────────────────────┐
+│   1. ROLE FILTER        │  ← User role determines allowed databases/tables
+│   (authentication)      │     Scientist → compound + proteomics tables
+│                         │     Business  → financial tables
+│                         │     Admin     → all tables
+└────────────┬────────────┘
+             │  (only allowed tables remain)
+             ▼
+┌─────────────────────────┐
+│   2. TABLE SELECTION    │  ← Vector similarity + LLM picks relevant table(s)
+│   (query routing)       │     "Show me potent PPARG compounds" → compounds table
+│                         │     Small scale: LLM reads descriptions directly
+│                         │     Large scale: vector search pre-filters, then LLM picks
+└────────────┬────────────┘
+             │  (1–3 relevant tables identified)
+             ▼
+┌─────────────────────────┐
+│   3. TOOL SCOPING       │  ← Selected table's hardcoded tools loaded
+│   (schema-matched)      │     compounds → [searchByTarget, filterByAffinity, getCompoundDetails]
+│                         │     proteomics → [searchFragments, getBindingSites]
+│                         │     Only 3–10 tools sent to Anthropic API
+└────────────┬────────────┘
+             │  (small, relevant tool set)
+             ▼
+┌─────────────────────────┐
+│   4. MCP TOOL CALL      │  ← LLM selects and calls from scoped tool set
+│   (existing Phase 1     │     This layer is what Phase 1 builds
+│    architecture)        │     No changes needed to tools, handlers, or queries
+└─────────────────────────┘
+```
+
+**Critical design consideration — cross-table queries:** The table selection stage should not be hardcoded to return exactly one table. Some legitimate queries span multiple tables — for example, "show me potent PPARG compounds and their associated fragment binding data" requires both the compounds table and the proteomics table. The vector search stage should return the top 2–3 matching tables rather than strictly 1, and the combined tool set from those tables (maybe 6–10 tools) is still small enough for reliable LLM selection. Designing for single-table-only routing now would require a rewrite when cross-table queries are needed. Allowing 2–3 tables from the start costs nothing and keeps the option open.
+
+**Why this does not require rewriting Phase 1 code:** The cascade sits above the existing MCP layer. Phase 1 builds layer 4 in the diagram — tools, handlers, query functions, database connection. The cascade (layers 1–3) determines which tools from layer 4 get sent to the Anthropic API. It changes how tools are selected, not what the tools do. The only code that changes is server.js, which currently hardcodes the tool list and would instead receive it from the cascade. Tools, handlers, and query functions remain identical.
+
+**Interview line:** "I designed the tool routing as a three-stage cascade — role filter, table selection, tool scoping — so the LLM never sees more than about 10 tools regardless of how many data sources the system has. Each stage narrows the funnel, and the MCP layer at the bottom doesn't change at all. The cascade is purely additive to what Phase 1 builds."
+
+---
+
 ## Section 2 — Bug Log
 
 *No entries yet. Add bugs as they occur during the build.*
@@ -297,7 +431,44 @@ curl "https://www.ebi.ac.uk/chembl/api/data/molecule/CHEMBL121.json" | python3 -
 
 ## Section 3 — Things I Didn't Know Before
 
-*No entries yet. Add learning moments as they occur.*
+### [LRN-01] How MCP works, why it beats having an LLM write queries directly, and how we plan to make tools more dynamic
+
+**Date:** March 29, 2026
+**Phase:** 1
+
+**What I learned:**
+
+Before this conversation I understood MCP as "what allows agents to access outside information like APIs." That's true but incomplete. The more precise way to think about it is: MCP is a standardized way of telling an LLM exactly which actions it is allowed to take and exactly what each action needs as input. Without MCP the LLM is just generating text. With MCP the LLM can trigger real function calls in your code.
+
+**Why you can't just tell the LLM to write MongoDB queries directly:**
+
+There are two failure modes. First, the LLM hallucinates — it generates a response that sounds like real compound data but is completely made up. Plausible-sounding IC50 values, compound names that don't exist, structures that are chemically impossible. For a drug discovery tool this is worse than useless. Second, even if the LLM writes a correct query as text, that text is just a string. Nothing executes it. Nothing connects to the database. The user gets a query they'd have to run themselves.
+
+MCP solves both problems. The LLM doesn't generate answers from memory and it doesn't produce query strings. Instead it calls a typed tool with defined parameters, your code runs the real MongoDB query, and real data comes back. The LLM formats that real data into a response. It cannot hallucinate a compound because it is forced to retrieve one.
+
+**My analogy that clicked:**
+
+A good way to think about it: without an LLM, decisions are made with hardcoded conditionals — "if the user typed 'PPARG' run this query, if they typed 'AR' run that one." The LLM replaces that conditional with something that can read any natural language and decide which function to run. It is an infinitely flexible conditional that understands intent rather than matching exact strings.
+
+**How the function chain works:**
+
+There are two separate layers that are easy to confuse. `getCompoundsByTarget` in `src/db/queries.js` is a plain JavaScript function that talks directly to MongoDB — no LLM involved. `searchByTarget` in `src/mcp/handlers.js` is the bridge — when the LLM decides to use the `search_by_target` tool, the server calls `searchByTarget`, which calls `getCompoundsByTarget`, which queries MongoDB, and the real data flows back up the chain to the LLM. Clean separation: the database function doesn't know about the LLM, the handler doesn't know about MongoDB directly.
+
+**How the query object works (SQL to MongoDB translation):**
+
+Coming from SQL, MongoDB doesn't use query strings — it uses JavaScript objects. The `query` object is your WHERE clause, built dynamically by adding fields only when the LLM asked for them. The `options` object is your ORDER BY and LIMIT. MongoDB's `$gte`, `$lte`, and `$regex` operators map directly to `>=`, `<=`, and `LIKE` in SQL. If a field isn't added to the `query` object, MongoDB doesn't filter on it — the condition simply doesn't exist. No LLM runs anywhere inside `queryCompounds` — the LLM's entire contribution was translating the user's English into a JSON object, and then it stepped aside.
+
+**How we plan to move from rigid tools to dynamic tools:**
+
+The three Phase 1 tools (`search_by_target`, `filter_by_affinity`, `get_compound_details`) are intentionally simple — one or two hardcoded fields each. The limitation is real: `filter_by_affinity` only knows about `pchembl_value`. It cannot filter by mol_weight, max_phase, withdrawn_flag, or name pattern. In Phase 2 we plan to replace these rigid tools with a single dynamic tool called `query_compounds` that accepts any combination of filter parameters. The LLM includes only the parameters it needs for a given query, and the function builds the MongoDB filter object dynamically — only adding conditions for parameters the LLM actually provided. This is the equivalent of a dynamic SQL WHERE clause builder. Adding support for a new field is a five-line change.
+
+**Why it matters for the project:**
+
+This is the upgrade story for the interview. Phase 1 tools demonstrate the concept. Phase 2 `query_compounds` demonstrates that I understood the limitation, designed around it, and built something a scientist could actually use for arbitrary queries — not just the three questions we hardcoded.
+
+---
+
+*Add further learning moments as they occur.*
 
 **Template:**
 ```

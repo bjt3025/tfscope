@@ -111,6 +111,26 @@ If the interview date has passed, this file is still valid for any continued dev
 
 ---
 
+## Code Comments Standard
+
+Every function in this project must include:
+
+**JSDoc block above the function:**
+- Purpose — one line describing what the function does
+- Called by — single line listing the caller
+- Calls — single line listing what it calls
+- Returns — the return shape
+- Error handling — what happens on failure and *why* that approach was chosen
+
+**Inline comments inside the function body:**
+- A comment above each logical section explaining what that block does and why
+- Edge case callouts where they occur — e.g. `// returns [] not null — callers expect an array`
+- Explain design decisions, not just mechanics — if something is done a specific way for a reason, say so
+
+**Reference:** The function specs in `brief.md` Section 8 are the source of truth for what each JSDoc block should contain.
+
+---
+
 ## Starting a New Session — Checklist
 
 When beginning any new session, Claude should complete these steps before anything else:

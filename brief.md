@@ -202,24 +202,26 @@ Check off steps as completed. Do not start Phase 2 until all Phase 1 steps are c
 - [x] 1.9 Add "test": "jest" and "dev": "nodemon server.js" scripts to package.json (~2 min)
 - [x] 1.10 First commit: git add . && git commit -m "Phase 1 Step 1: project scaffold" (~1 min)
 
+> **Note:** GitHub repo created at https://github.com/bjt3025/tfscope (private). SSH authentication configured. Steps 1 and 2 commits pushed to `main`.
+
 #### Step 2 — MongoDB Atlas Setup (~25 min)
-- [ ] 2.1 Create MongoDB Atlas account at mongodb.com/atlas (~3 min)
-- [ ] 2.2 Create a free M0 cluster — select AWS, us-east-1 (~5 min, includes provisioning wait)
-- [ ] 2.3 Create a database user with read/write permissions (~2 min)
-- [ ] 2.4 Whitelist IP address 0.0.0.0/0 for local development (~2 min)
-- [ ] 2.5 Create database named tfscope and collection named compounds (~3 min)
-- [ ] 2.6 Copy connection string into .env as MONGODB_URI — replace <password> placeholder with actual password (~3 min)
-- [ ] 2.7 Add Anthropic API key to .env as ANTHROPIC_API_KEY (~2 min)
-- [ ] 2.8 Verify .env is in .gitignore before any commit (~1 min)
-- [ ] 2.9 Commit: "Phase 1 Step 2: env config" (no .env file committed) (~2 min)
+- [x] 2.1 Create MongoDB Atlas account at mongodb.com/atlas (~3 min)
+- [x] 2.2 Create a free M0 cluster — select AWS, us-east-1 (~5 min, includes provisioning wait)
+- [x] 2.3 Create a database user with read/write permissions (~2 min)
+- [x] 2.4 Whitelist IP address 0.0.0.0/0 for local development (~2 min)
+- [x] 2.5 Create database named tfscope and collection named compounds (~3 min)
+- [x] 2.6 Copy connection string into .env as MONGODB_URI — replace <password> placeholder with actual password (~3 min)
+- [x] 2.7 Add Anthropic API key to .env as ANTHROPIC_API_KEY (~2 min)
+- [x] 2.8 Verify .env is in .gitignore before any commit (~1 min)
+- [x] 2.9 Commit: "Phase 1 Step 2: env config" (no .env file committed) (~2 min)
 
 #### Step 3 — Database Connection (~15 min)
-- [ ] 3.1 Write src/db/connection.js — Mongoose connection using process.env.MONGODB_URI, matching the function spec in Section 8 exactly (~5 min)
-- [ ] 3.2 Add console log on success: "MongoDB connected: <host>" (~1 min)
-- [ ] 3.3 Add error handling: log error and process.exit(1) on failure — do not catch and continue (~2 min)
-- [ ] 3.4 Test by running node src/db/connection.js directly — confirm success log, no errors (~3 min)
-- [ ] 3.5 Test failure case: temporarily break the URI and confirm the process exits with a clear error (~2 min)
-- [ ] 3.6 Commit: "Phase 1 Step 3: MongoDB connection confirmed" (~2 min)
+- [x] 3.1 Write src/db/connection.js — Mongoose connection using process.env.MONGODB_URI, matching the function spec in Section 8 exactly (~5 min)
+- [x] 3.2 Add console log on success: "MongoDB connected: <host>" (~1 min)
+- [x] 3.3 Add error handling: log error and process.exit(1) on failure — do not catch and continue (~2 min)
+- [x] 3.4 Test by running node src/db/connection.js directly — confirm success log, no errors (~3 min)
+- [x] 3.5 Test failure case: temporarily break the URI and confirm the process exits with a clear error (~2 min)
+- [x] 3.6 Commit: "Phase 1 Step 3: MongoDB connection confirmed" (~2 min)
 
 #### Step 4 — Seed Data (~60 min)
 - [ ] 4.1 Run curl commands against ChEMBL API for all 10 compounds to pull real SMILES, pchembl_value, mol_weight, alogp, hba, hbd, psa, qed_weighted, inchi_key, max_phase, first_approval, withdrawn_flag (~20 min)
@@ -801,5 +803,9 @@ Derived from real ChEMBL API responses on March 28, 2026.
 
 ---
 
-*Last updated: March 28, 2026*
-*Next update: After Phase 1 Step 3 (database connection confirmed working)*
+---
+
+## Notes for Future Self
+
+- MongoDB Atlas account and Anthropic (Claude) API key were both created using **benjthomas@umass.edu**
+- **Action required before Step 3:** The `MONGODB_URI` in `.env` still has `<benjthomas_db_user>` as a placeholder for the password — replace it with the actual Atlas database user password before running the connection test

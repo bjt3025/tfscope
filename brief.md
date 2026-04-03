@@ -74,6 +74,7 @@ tfscope/
 │   │
 │   ├── db/
 │   │   ├── connection.js         # MongoDB Atlas connection setup via Mongoose
+│   │   ├── compound.js           # Mongoose model for the compounds collection
 │   │   └── queries.js            # All MongoDB query functions
 │   │
 │   └── utils/
@@ -224,14 +225,37 @@ Check off steps as completed. Do not start Phase 2 until all Phase 1 steps are c
 - [x] 3.6 Commit: "Phase 1 Step 3: MongoDB connection confirmed" (~2 min)
 
 #### Step 4 — Seed Data (~60 min)
-- [ ] 4.1 Run curl commands against ChEMBL API for all 10 compounds to pull real SMILES, pchembl_value, mol_weight, alogp, hba, hbd, psa, qed_weighted, inchi_key, max_phase, first_approval, withdrawn_flag (~20 min)
-- [ ] 4.2 Record all verified values somewhere temporary so they can be transcribed into seed documents (~5 min)
-- [ ] 4.3 Write seed/seed.js — script that connects to MongoDB and inserts 10 documents (~10 min)
-- [ ] 4.4 Write all 10 compound documents in the exact schema shape from Section 10 — every field present, every type correct (numbers as numbers, not strings) (~15 min)
-- [ ] 4.5 Run node seed/seed.js — confirm "10 documents inserted" or equivalent (~2 min)
-- [ ] 4.6 Open Atlas UI — visually verify 10 documents exist in the compounds collection (~3 min)
-- [ ] 4.7 Spot-check at least 2 documents in Atlas: confirm numeric fields are stored as numbers, SMILES strings look like real molecular notation (~3 min)
-- [ ] 4.8 Commit: "Phase 1 Step 4: 10 seed compounds inserted" (~2 min)
+- [x] 4.1 Run curl commands against ChEMBL API for all 9 compounds to pull real SMILES, pchembl_value, mol_weight, alogp, hba, hbd, psa, qed_weighted, inchi_key, max_phase, first_approval, withdrawn_flag (~20 min)
+- [x] 4.2 Record all verified values somewhere temporary so they can be transcribed into seed documents (~5 min)
+- [x] 4.3 Write seed/seed.js — script that connects to MongoDB and inserts 9 documents (~10 min)
+- [x] 4.3a Write src/db/compound.js — Mongoose model for the compounds collection, required by seed.js to call insertMany()
+
+  ```javascript
+  const mongoose = require('mongoose')
+
+  const compoundSchema = new mongoose.Schema({
+    chembl_id: String, name: String, smiles: String, inchi_key: String,
+    target_protein: String, target_chembl_id: String, target_full_name: String,
+    assay_chembl_id: String, assay_description: String, assay_type: String,
+    document_journal: String, document_year: Number,
+    standard_value: Number, standard_relation: String, standard_units: String,
+    pchembl_value: Number,
+    ligand_efficiency: { bei: Number, le: Number, lle: Number, sei: Number },
+    mol_weight: Number, alogp: Number, hba: Number, hbd: Number,
+    psa: Number, qed_weighted: Number, num_ro5_violations: Number,
+    max_phase: Number, first_approval: Number, withdrawn_flag: Boolean,
+    source: String, created_at: Date
+  })
+
+  module.exports = mongoose.model('Compound', compoundSchema)
+  // 'Compound' → Mongoose auto-pluralizes to 'compounds' collection in MongoDB
+  ```
+
+- [x] 4.4 Write all 9 compound documents in the exact schema shape from Section 10 — every field present, every type correct (numbers as numbers, not strings) (~15 min)
+- [x] 4.5 Run node seed/seed.js — confirm "9 documents inserted" or equivalent (~2 min)
+- [x] 4.6 Open Atlas UI — visually verify 9 documents exist in the compounds collection (~3 min)
+- [x] 4.7 Spot-check at least 2 documents in Atlas: confirm numeric fields are stored as numbers, SMILES strings look like real molecular notation (~3 min)
+- [x] 4.8 Commit: "Phase 1 Step 4: 9 seed compounds inserted" (~2 min)
 
 #### Step 5 — MongoDB Query Functions (~45 min)
 - [ ] 5.1 Write getCompoundsByTarget(target) in src/db/queries.js — .find({ target_protein }), returns [] on no results, never throws (~8 min)
@@ -297,7 +321,7 @@ Check off steps as completed. Do not start Phase 2 until all Phase 1 steps are c
 - [ ] 8D-opt.2 Set up RDKit.js initialization in App.jsx or dedicated context provider — load WASM on mount, store instance in state (~15 min)
 - [ ] 8D-opt.3 Add SMILES → 2D SVG rendering in CompoundCard using initialized RDKit instance (~10 min)
 - [ ] 8D-opt.4 Handle edge cases: invalid SMILES → "structure unavailable" fallback, RDKit not loaded → placeholder (~5 min)
-- [ ] 8D-opt.5 Test: confirm molecule images render for all 10 seed compounds (~5 min)
+- [ ] 8D-opt.5 Test: confirm molecule images render for all 9 seed compounds (~5 min)
 - [ ] 8D-opt.6 Commit: "Phase 1 Step 8D-optional: RDKit.js molecule rendering added" (~2 min)
 
 #### Step 8E — Full Frontend Integration and Polish (frontend) (~30 min)
@@ -664,34 +688,26 @@ module.exports.handler = serverless(app)
 
 ## 9. Seed Data Spec
 
-10 real compounds seeded manually in Phase 1. Chosen to cover both targets, a range of potencies, and at least two approved drugs per target for demo variety.
+9 real compounds seeded manually in Phase 1. Chosen to cover both targets, a range of potencies, and at least two approved drugs per target for demo variety.
 
-> **Before writing seed documents:** Run the curl command below for each ChEMBL ID to pull the exact SMILES string and verify pchembl_value from the real API. Do not invent or approximate SMILES strings — RDKit.js will silently fail to render an incorrect one.
-> ```bash
-> curl "https://www.ebi.ac.uk/chembl/api/data/molecule/CHEMBL121.json" | python3 -m json.tool
-> ```
+### PPARG Compounds (4)
 
-### PPARG Compounds (5)
-
-| # | Name | ChEMBL ID | Est. pchembl | Notes |
-|---|------|-----------|--------------|-------|
-| 1 | Rosiglitazone | CHEMBL121 | ~7.52 | Approved then withdrawn — classic PPARG agonist, reference compound |
-| 2 | Pioglitazone | CHEMBL595 | ~7.10 | Approved drug still in use — good contrast with withdrawn rosiglitazone |
-| 3 | GW1929 | CHEMBL1999 | ~8.30 | High potency tool compound — good for potency filter demos |
-| 4 | T0070907 | CHEMBL195743 | ~7.80 | PPARG antagonist — shows mechanism diversity beyond agonists |
-| 5 | SR1664 | CHEMBL2180676 | ~7.20 | Non-agonist PPARG modulator — more recent compound class |
+| # | Name | ChEMBL ID | Notes |
+|---|------|-----------|-------|
+| 1 | Rosiglitazone | CHEMBL121 | Approved then withdrawn — classic PPARG agonist, reference compound |
+| 2 | Pioglitazone | CHEMBL595 | Approved drug still in use — good contrast with withdrawn rosiglitazone |
+| 3 | T0070907 | CHEMBL195743 | PPARG antagonist — shows mechanism diversity beyond agonists |
+| 4 | SR1664 | CHEMBL2180676 | Non-agonist PPARG modulator — more recent compound class |
 
 ### AR Compounds (5)
 
-| # | Name | ChEMBL ID | Est. pchembl | Notes |
-|---|------|-----------|--------------|-------|
-| 6 | Enzalutamide | CHEMBL1946170 | ~8.50 | Approved for mCRPC — directly relevant to Flare FX-111 program |
-| 7 | Bicalutamide | CHEMBL1619 | ~7.00 | Older approved AR antagonist — good historical contrast |
-| 8 | Apalutamide | CHEMBL3707321 | ~8.20 | Next-gen approved AR antagonist |
-| 9 | Darolutamide | CHEMBL3545388 | ~8.10 | Approved, structurally distinct from enzalutamide |
-| 10 | ARN-509 | CHEMBL2180681 | ~8.30 | Clinical compound, close analog to enzalutamide |
-
-**TODO:** Populate actual pchembl_value, smiles, inchi_key, mol_weight, and all other numeric fields from real API calls before writing seed documents.
+| # | Name | ChEMBL ID | Notes |
+|---|------|-----------|-------|
+| 5 | Enzalutamide | CHEMBL1082407 | Approved for mCRPC — directly relevant to Flare FX-111 program |
+| 6 | Bicalutamide | CHEMBL409 | Older approved AR antagonist — good historical contrast |
+| 7 | Apalutamide | CHEMBL3183409 | Next-gen approved AR antagonist |
+| 8 | Darolutamide | CHEMBL4297185 | Approved, structurally distinct from enzalutamide |
+| 9 | ARN-509 | CHEMBL2180681 | Clinical compound, close analog to enzalutamide |
 
 ---
 

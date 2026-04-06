@@ -258,12 +258,12 @@ Check off steps as completed. Do not start Phase 2 until all Phase 1 steps are c
 - [x] 4.8 Commit: "Phase 1 Step 4: 9 seed compounds inserted" (~2 min)
 
 #### Step 5 — MongoDB Query Functions (~45 min)
-- [ ] 5.1 Write getCompoundsByTarget(target) in src/db/queries.js — .find({ target_protein }), returns [] on no results, never throws (~8 min)
-- [ ] 5.2 Write getCompoundsByAffinity(target, minPchembl) — .find() with $gte filter, .sort({ pchembl_value: -1 }), returns [] on no results (~8 min)
-- [ ] 5.3 Write getCompoundById(chemblId) — .findOne({ chembl_id }), returns null if not found (~5 min)
-- [ ] 5.4 Write all 8 unit tests in tests/unit/queries.test.js matching Section 11 spec (QU-01 through QU-08) (~15 min)
-- [ ] 5.5 Run npm test — all 8 tests must pass (~5 min, including debugging)
-- [ ] 5.6 Commit: "Phase 1 Step 5: query functions + tests passing" (~2 min)
+- [x] 5.1 Write getCompoundsByTarget(target) in src/db/queries.js — .find({ target_protein }), returns [] on no results, never throws (~8 min)
+- [x] 5.2 Write getCompoundsByAffinity(target, minPchembl) — .find() with $gte filter, .sort({ pchembl_value: -1 }), returns [] on no results (~8 min)
+- [x] 5.3 Write getCompoundById(chemblId) — .findOne({ chembl_id }), returns null if not found (~5 min)
+- [x] 5.4 Write all 8 unit tests in tests/unit/queries.test.js matching Section 11 spec (QU-01 through QU-08) (~15 min)
+- [x] 5.5 Run npm test — all 8 tests must pass (~5 min, including debugging)
+- [x] 5.6 Commit: "Phase 1 Step 5: query functions + tests passing" (~2 min)
 
 #### Step 6 — MCP Tool Definitions and Handlers (~45 min)
 - [ ] 6.1 Write src/mcp/tools.js — export the array of 3 tool definition objects exactly as specified in Section 8 (search_by_target, filter_by_affinity, get_compound_details) (~10 min)

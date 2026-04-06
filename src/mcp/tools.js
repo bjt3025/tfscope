@@ -8,7 +8,7 @@ module.exports = [
     // without specifying a minimum potency threshold.
     name: "search_by_target",
     description: "Search the compound database for all molecules targeting a specific protein. Use when the user asks about compounds for PPARG or AR without specifying a potency threshold.",
-    inputSchema: {
+    input_schema: {
       type: "object",
       properties: {
         target: {
@@ -26,7 +26,7 @@ module.exports = [
     // Higher = more potent. Claude uses this when the user mentions potency, threshold, or "strong/potent".
     name: "filter_by_affinity",
     description: "Return compounds for a target protein filtered by minimum potency. pchembl_value is -log10(IC50) — higher values mean more potent. Use when the user specifies a potency threshold or asks for potent or strong compounds.",
-    inputSchema: {
+    input_schema: {
       type: "object",
       properties: {
         target: {
@@ -47,7 +47,7 @@ module.exports = [
     // on one result — e.g. "tell me about Rosiglitazone" or "what is CHEMBL121?".
     name: "get_compound_details",
     description: "Return full details for a single compound by its ChEMBL ID. Use when the user asks about a specific named compound or requests more detail on one result.",
-    inputSchema: {
+    input_schema: {
       type: "object",
       properties: {
         chembl_id: {

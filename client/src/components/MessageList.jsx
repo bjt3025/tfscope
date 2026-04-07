@@ -1,15 +1,15 @@
 // MessageList.jsx — renders the conversation history as a list of chat bubbles.
 // Receives the messages array from App.js and maps each entry to a styled block.
-// CompoundCard rendering is wired in during Step 8D.
+
+import CompoundCard from './CompoundCard'
 
 /**
  * MessageList — displays all conversation turns in order.
  *
  * @description Maps over the messages array and renders each as a div with a
- *   role-based CSS class (message--user or message--assistant) so they can be
- *   styled differently.  The text field is rendered as preformatted text to
- *   preserve Claude's markdown-style line breaks until a markdown renderer is
- *   added in the styling pass.
+ *   role-based CSS class (message--user or message--assistant).  For assistant
+ *   messages that include compound data, renders a CompoundCard below the text
+ *   for each compound.
  * @calledBy App.js
  * @param {Array} props.messages  Array of { role, text, compounds } objects
  * @returns {JSX.Element}
@@ -33,7 +33,15 @@ function MessageList({ messages }) {
               preserves them without requiring a full markdown renderer yet */}
           <p className="message__text">{msg.text}</p>
 
-          {/* CompoundCard list is rendered here in Step 8D */}
+          {/* Render one CompoundCard per compound returned by the tool call.
+              compounds is [] for user messages and assistant messages with no tool results */}
+          {msg.compounds && msg.compounds.length > 0 && (
+            <div className="compound-card-list">
+              {msg.compounds.map(compound => (
+                <CompoundCard key={compound.chembl_id} compound={compound} />
+              ))}
+            </div>
+          )}
         </div>
       ))}
     </div>

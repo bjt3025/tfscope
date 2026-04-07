@@ -1,4 +1,5 @@
-/* App.css — layout and component styles for TFScope. */
+/* App.css — layout and component styles for TFScope.
+   Sections: app layout, message list, loading, chat input, compound card */
 
 .app {
   max-width: 800px;
@@ -95,4 +96,89 @@
 .chat-input button:disabled {
   background-color: #a0c4f1;
   cursor: not-allowed;
+}
+
+/* ── Compound cards ─────────────────────────────────────────────────────── */
+
+.compound-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.compound-card {
+  background-color: #f9f9f9;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 14px 16px;
+  font-size: 13px;
+}
+
+.compound-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.compound-card__name {
+  font-weight: 700;
+  font-size: 14px;
+  color: #1d1d1f;
+}
+
+.compound-card__id {
+  font-size: 11px;
+  color: #888;
+  font-family: monospace;
+}
+
+.compound-card__withdrawn {
+  color: #c0392b;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.compound-card__table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 10px;
+}
+
+.compound-card__table th {
+  text-align: left;
+  color: #555;
+  font-weight: 500;
+  padding: 3px 12px 3px 0;
+  width: 110px;
+}
+
+.compound-card__table td {
+  color: #1d1d1f;
+  padding: 3px 0;
+}
+
+.compound-card__smiles {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e8e8e8;
+}
+
+.compound-card__smiles-label {
+  display: block;
+  font-size: 11px;
+  color: #888;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 4px;
+}
+
+.compound-card__smiles-value {
+  font-size: 11px;
+  color: #555;
+  word-break: break-all;
+  font-family: monospace;
 }

@@ -266,13 +266,13 @@ Check off steps as completed. Do not start Phase 2 until all Phase 1 steps are c
 - [x] 5.6 Commit: "Phase 1 Step 5: query functions + tests passing" (~2 min)
 
 #### Step 6 — MCP Tool Definitions and Handlers (~45 min)
-- [ ] 6.1 Write src/mcp/tools.js — export the array of 3 tool definition objects exactly as specified in Section 8 (search_by_target, filter_by_affinity, get_compound_details) (~10 min)
-- [ ] 6.2 Write searchByTarget(input) handler in src/mcp/handlers.js — validates input, calls getCompoundsByTarget(), returns { compounds } or { compounds: [], error } (~8 min)
-- [ ] 6.3 Write filterByAffinity(input) handler — calls getCompoundsByAffinity(), same error pattern (~5 min)
-- [ ] 6.4 Write getCompoundDetails(input) handler — calls getCompoundById(), returns { compound } or { compound: null, error } (~5 min)
-- [ ] 6.5 Write all 4 handler unit tests in tests/unit/handlers.test.js matching Section 11 (HU-01 through HU-04) (~10 min)
-- [ ] 6.6 Run npm test — all query + handler tests pass (~5 min)
-- [ ] 6.7 Commit: "Phase 1 Step 6: MCP tools + handlers + tests passing" (~2 min)
+- [x] 6.1 Write src/mcp/tools.js — export the array of 3 tool definition objects exactly as specified in Section 8 (search_by_target, filter_by_affinity, get_compound_details) (~10 min)
+- [x] 6.2 Write searchByTarget(input) handler in src/mcp/handlers.js — validates input, calls getCompoundsByTarget(), returns { compounds } or { compounds: [], error } (~8 min)
+- [x] 6.3 Write filterByAffinity(input) handler — calls getCompoundsByAffinity(), same error pattern (~5 min)
+- [x] 6.4 Write getCompoundDetails(input) handler — calls getCompoundById(), returns { compound } or { compound: null, error } (~5 min)
+- [x] 6.5 Write all 4 handler unit tests in tests/unit/handlers.test.js matching Section 11 (HU-01 through HU-04) (~10 min)
+- [x] 6.6 Run npm test — all query + handler tests pass (~5 min)
+- [x] 6.7 Commit: "Phase 1 Step 6: MCP tools + handlers + tests passing" (~2 min)
 
 #### Step 7 — Express Server and Anthropic API (~60 min)
 - [ ] 7.1 Write server.js skeleton — Express app, dotenv config, CORS middleware, serverless-http export at bottom, app.listen() conditional on NODE_ENV (~10 min)
@@ -298,14 +298,25 @@ Check off steps as completed. Do not start Phase 2 until all Phase 1 steps are c
 
 #### Step 8B — API Service Layer and Chat Input (frontend) (~25 min)
 - [ ] 8B.1 Write client/src/services/api.js — fetch() POST to /query with { message }, returns parsed JSON (~8 min)
+- [ ] 8B.1b Update client/src/services/api.js to accept both message and history as parameters and send both in the POST request body: { message, history } (~3 min)
+- [ ] 8B.1c Update POST /query in server.js to accept history from the request body and pass the full history to the Anthropic API call like this:
+  ```js
+  messages: [
+    ...history,
+    { role: "user", content: message }
+  ]
+  ```
+  If history is undefined or empty, default to an empty array so existing behavior is preserved: `const history = req.body.history || []` (~5 min)
 - [ ] 8B.2 Write ChatInput.jsx — controlled text input, submit button, calls onSubmit(message) prop, clears input after submit (~10 min)
 - [ ] 8B.3 Wire ChatInput into App.jsx temporarily — on submit call api.js, log response to console (~5 min)
 - [ ] 8B.4 Test: type "Show me PPARG compounds" in browser, confirm compound data appears in console (~2 min)
 
 #### Step 8C — Message List and Conversation State (frontend) (~30 min)
-- [ ] 8C.1 Define conversation state in App.jsx — array of message objects [{ role: "user" | "assistant", text, compounds }] (~5 min)
+- [ ] 8C.1 Define two separate state arrays in App.jsx:
+  - `messages` — the full display array used to render the chat UI, contains `{ role, text, compounds }` objects including compound data for rendering cards
+  - `history` — the API history array used for Anthropic context, contains only `{ role: "user" | "assistant", content: string }` objects — compound data is never included here because it adds no context for Claude
 - [ ] 8C.2 Write MessageList.jsx — receives messages array, renders each as a block with user/assistant distinction (~15 min)
-- [ ] 8C.3 Wire state: on submit, add user message → call API → add assistant response + compounds to state (~5 min)
+- [ ] 8C.3 Wire state: on submit, add user message to both `messages` and `history` → call API passing current `history` → add assistant response text to both `messages` and `history`, add compounds only to `messages` — never to `history` (~5 min)
 - [ ] 8C.4 Add loading state — show loading indicator while waiting for API response (~3 min)
 - [ ] 8C.5 Test: submit a query, see both user message and assistant text response rendered in chat (~2 min)
 

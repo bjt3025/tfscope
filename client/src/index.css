@@ -1,0 +1,6 @@
+/* index.css — base reset applied to the entire page. */
+
+body {
+  margin: 0;
+  background-color: #f5f5f5;
+}

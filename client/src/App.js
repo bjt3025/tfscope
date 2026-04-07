@@ -1,10 +1,11 @@
 // App.js — root component for TFScope.
 // Owns all conversation state and coordinates the API call.
-// MessageList and CompoundCard are wired in during Steps 8C–8D.
+// CompoundCard is wired into MessageList during Step 8D.
 
 import { useState } from 'react'
 import './App.css'
 import ChatInput from './components/ChatInput'
+import MessageList from './components/MessageList'
 import { postQuery } from './services/api'
 
 /**
@@ -78,10 +79,9 @@ function App() {
   return (
     <div className="app">
       <h1>TFScope</h1>
-      {/* MessageList replaces this debug block in Step 8C */}
-      <pre style={{ fontSize: 12, maxHeight: 300, overflow: 'auto' }}>
-        {JSON.stringify(messages, null, 2)}
-      </pre>
+      <MessageList messages={messages} />
+      {/* Loading indicator shown while waiting for the API response */}
+      {loading && <p className="loading">Thinking…</p>}
       <ChatInput onSubmit={handleSubmit} loading={loading} />
     </div>
   )

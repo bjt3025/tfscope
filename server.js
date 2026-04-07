@@ -95,16 +95,24 @@ async function dispatchTool(name, input) {
 // ---------------------------------------------------------------------------
 app.post('/query', async (req, res) => {
   try {
-    const { message } = req.body
+    const { message, history } = req.body
 
     // Guard: reject requests with no message body
     if (!message) {
       return res.status(400).json({ error: 'message is required' })
     }
 
-    // Build the initial messages array.  We send the user's question as a
-    // human turn; Claude will reply with either a text answer or a tool call.
-    const messages = [{ role: 'user', content: message }]
+    // Default history to [] so curl requests without a history field still work.
+    // history is the Anthropic-format array of prior turns built by the frontend:
+    // [{ role: "user", content: string }, { role: "assistant", content: string }, ...]
+    const priorHistory = history || []
+
+    // Build the messages array by prepending prior turns before the current message.
+    // This gives Claude full conversation context for follow-up questions.
+    const messages = [
+      ...priorHistory,
+      { role: 'user', content: message }
+    ]
 
     // compounds accumulates the data returned by tool calls so the frontend
     // can render CompoundCards alongside Claude's text response.

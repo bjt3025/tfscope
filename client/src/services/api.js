@@ -21,7 +21,7 @@
  *   non-OK status.  The caller (App.js) catches this and displays an error message.
  */
 async function postQuery(message, history = []) {
-  const res = await fetch('/query', {
+  const res = await fetch('https://idvdxsieb0.execute-api.us-east-2.amazonaws.com/query', {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
     // Send both the current message and the full prior history so the server

@@ -3,7 +3,7 @@ frontend:
   phases:
     preBuild:
       commands:
-        - cd client && npm ci --cache .npm --prefer-offline
+        - cd client && npm install
     build:
       commands:
         - cd client && npm run build
@@ -13,4 +13,4 @@ frontend:
       - '**/*'
   cache:
     paths:
-      - client/.npm/**/*
+      - client/node_modules/**/*

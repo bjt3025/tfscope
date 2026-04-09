@@ -6,7 +6,7 @@ frontend:
         - cd client && npm install
     build:
       commands:
-        - cd client && npm run build
+        - npm run build --prefix client
   artifacts:
     baseDirectory: client/build
     files:

@@ -64,9 +64,9 @@ const anthropic = new Anthropic()
 async function dispatchTool(name, input) {
   // Route to the matching handler.  The tool names here must exactly match the
   // `name` fields in src/mcp/tools.js — Claude uses those names when it fires a tool call.
-  if (name === 'search_by_target')     return searchByTarget(input)
-  if (name === 'filter_by_affinity')   return filterByAffinity(input)
-  if (name === 'get_compound_details') return getCompoundDetails(input)
+  //if (name === 'search_by_target')     return searchByTarget(input)
+  //if (name === 'filter_by_affinity')   return filterByAffinity(input)
+  //if (name === 'get_compound_details') return getCompoundDetails(input)
   if (name === 'query_compounds')      return queryCompoundsHandler(input)
 
   // Unrecognised tool name — surface as a structured error rather than throwing

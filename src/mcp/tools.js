@@ -3,6 +3,10 @@
 // Input: tool name, tool description, table schema to Claude API before each call 
 
 module.exports = [
+  /* Tools 1-3 commented out — replaced by query_compounds (Tool 4) which handles
+     all the same cases plus range queries, multi-field filters, and sorting.
+     Keeping the code here for reference; handlers and query functions remain intact.
+
   {
     // Tool 1: search all compounds for a given target protein, no potency filter.
     name: "search_by_target",
@@ -45,7 +49,7 @@ Example of what Claudes output would look like for filter_by_affinity
   min_pchembl: 7.0
 }
 */
-
+/*
   {
     // Tool 3: look up a single compound by its ChEMBL ID.
     name: "get_compound_details",
@@ -61,6 +65,7 @@ Example of what Claudes output would look like for filter_by_affinity
       required: ["chembl_id"]
     }
   },
+*/
 
   {
     // Tool 4: dynamic multi-field compound query.

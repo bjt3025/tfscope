@@ -1,9 +1,9 @@
-// Unit tests for all three query functions in src/db/queries.js.
+// Unit tests for all query functions in src/db/queries.js.
 // The Compound Mongoose model is mocked so tests run without a real database connection.
 
 jest.mock('../../src/db/compound')
 const Compound = require('../../src/db/compound')
-const { getCompoundsByTarget, getCompoundsByAffinity, getCompoundById } = require('../../src/db/queries')
+const { getCompoundsByTarget, getCompoundsByAffinity, getCompoundById, queryCompounds } = require('../../src/db/queries')
 
 // ---------------------------------------------------------------------------
 // Shared fake data — used across tests to simulate what MongoDB would return.
@@ -140,5 +140,70 @@ describe('getCompoundById', () => {
 
     // Returns null not [] — single-document lookup has no "empty array" concept
     expect(result).toBeNull()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// queryCompounds
+// queryCompounds chains .find().limit().sort() — the mock must return an object
+// with a limit() method that returns an object with a sort() method that resolves
+// the data. Each test verifies the correct MongoDB query is built from the filters.
+// ---------------------------------------------------------------------------
+
+describe('queryCompounds', () => {
+  // Helper: sets up the full .find().limit().sort() chain mock
+  const mockChain = (data) => {
+    Compound.find.mockReturnValue({
+      limit: jest.fn().mockReturnValue({
+        sort: jest.fn().mockResolvedValue(data)
+      })
+    })
+  }
+
+  // QU-09: string field filter builds an equality condition for target_protein
+  it('QU-09: filters by target_protein string equality', async () => {
+    mockChain(fakePPARG)
+
+    await queryCompounds({ target_protein: 'PPARG' })
+
+    // Verify Compound.find was called with the correct equality condition
+    expect(Compound.find).toHaveBeenCalledWith(
+      expect.objectContaining({ target_protein: 'PPARG' })
+    )
+  })
+
+  // QU-10: range filter with min only builds a $gte condition
+  it('QU-10: builds $gte condition for range filter with min only', async () => {
+    const highPotency = [{ chembl_id: 'CHEMBL1082407', pchembl_value: 7.31 }]
+    mockChain(highPotency)
+
+    await queryCompounds({ pchembl_value: { min: 7.0 } })
+
+    // $gte is MongoDB's >= operator — verifies the range object was translated correctly
+    expect(Compound.find).toHaveBeenCalledWith(
+      expect.objectContaining({ pchembl_value: { $gte: 7.0 } })
+    )
+  })
+
+  // QU-11: range filter with both min and max builds $gte + $lte condition
+  it('QU-11: builds $gte and $lte conditions for range filter with min and max', async () => {
+    mockChain(fakePPARG)
+
+    await queryCompounds({ mol_weight: { min: 200, max: 500 } })
+
+    expect(Compound.find).toHaveBeenCalledWith(
+      expect.objectContaining({ mol_weight: { $gte: 200, $lte: 500 } })
+    )
+  })
+
+  // QU-12: boolean filter builds a direct equality condition for withdrawn_flag
+  it('QU-12: filters by withdrawn_flag boolean equality', async () => {
+    mockChain(fakePPARG)
+
+    await queryCompounds({ withdrawn_flag: false })
+
+    expect(Compound.find).toHaveBeenCalledWith(
+      expect.objectContaining({ withdrawn_flag: false })
+    )
   })
 })

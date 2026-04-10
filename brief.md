@@ -1,10 +1,5 @@
 # TFScope — Technical Project Brief
 
-**Role:** Data Engineering / AI/ML Intern
-**Company:** Flare Therapeutics, Cambridge MA
-**Interview:** April 8, 2026
-**Last Updated:** March 28, 2026
-
 > **How to use this document:**
 > This is the technical ground truth for Claude Code. Feed it at the start of every session.
 > Decision rationale and bug log live in `journal.md` — do not mix them here.
@@ -14,7 +9,7 @@
 
 ## 1. Project Overview
 
-TFScope is a natural language research assistant that lets a scientist query a MongoDB database of real drug compounds targeting PPARG and AR using plain English. It is built specifically around Flare Therapeutics' two clinical pipeline targets.
+TFScope is a natural language research assistant that lets a scientist query a MongoDB database of real drug compounds targeting PPARG and AR using plain English.
 
 A scientist types a question like "Show me all PPARG inhibitors with a pchembl_value above 7, sorted by potency." The React frontend sends that to an Express backend, which passes it to the Anthropic API. Claude recognizes it needs data, calls a typed MCP tool, the MCP server queries MongoDB, and the real compound data comes back — formatted, readable, and with a 2D molecular structure rendered by RDKit.js.
 
@@ -54,53 +49,56 @@ graph TD
 
 ## 3. Folder Structure
 
-Every file annotated with its purpose. Claude Code should create files exactly at these paths.
+Every file annotated with its purpose.
 
 ```
 tfscope/
 │
-├── .env                          # Secret keys — never commit to git
-├── .gitignore                    # Must include .env, node_modules/, .DS_Store
-├── package.json                  # Project dependencies
-├── README.md                     # Project description for GitHub
+├── .env                          # Secret keys (ANTHROPIC_API_KEY, MONGODB_URI, PORT) — never commit to git
+├── .gitignore                    # Excludes .env, node_modules/, .DS_Store, notes/
+├── package.json                  # Backend dependencies and scripts (dev, test)
+├── amplify.yml                   # AWS Amplify build config — tells Amplify how to build the React frontend
 │
-├── server.js                     # Express entry point + serverless-http export
+├── server.js                     # Express entry point: boots DB, initializes Anthropic client,
+│                                 # runs POST /query tool-use loop, exports serverless-http handler for Lambda
 │
 ├── src/
 │   ├── mcp/
-│   │   ├── server.js             # MCP server setup and tool registration
-│   │   ├── tools.js              # Tool definitions (name, description, inputSchema)
-│   │   └── handlers.js           # Tool handler functions — calls db/queries.js
+│   │   ├── tools.js              # 3 MCP tool definitions (name, description, input_schema) sent to Anthropic API
+│   │   └── handlers.js           # 3 handler functions — one per tool — each calls a query in db/queries.js
 │   │
 │   ├── db/
-│   │   ├── connection.js         # MongoDB Atlas connection setup via Mongoose
-│   │   ├── compound.js           # Mongoose model for the compounds collection
-│   │   └── queries.js            # All MongoDB query functions
+│   │   ├── connection.js         # Connects to MongoDB Atlas via Mongoose; exits process on failure
+│   │   ├── compound.js           # Mongoose schema + model for the compounds collection
+│   │   └── queries.js            # 3 query functions: getCompoundsByTarget, getCompoundsByAffinity, getCompoundById
 │   │
 │   └── utils/
-│       └── transform.js          # ETL transform function (Phase 2)
+│       └── transform.js          # Empty — reserved for Phase 2 ETL transform logic
 │
 ├── seed/
-│   └── seed.js                   # Script to manually seed Phase 1 compound documents
+│   └── seed.js                   # One-time script: inserts 9 hardcoded compound documents into MongoDB Atlas
 │
-├── client/                       # React frontend
+├── client/                       # React frontend (separate npm project)
+│   ├── package.json              # Frontend dependencies (react, react-scripts, @rdkit/rdkit) and proxy config
 │   ├── public/
-│   │   └── index.html
+│   │   └── index.html            # HTML shell — React mounts into <div id="root">
 │   └── src/
-│       ├── App.jsx               # Root component — chat layout
+│       ├── App.js                # Root component — owns messages + history state, calls API, renders layout
+│       ├── App.css               # All styles: layout, chat bubbles, compound cards, chat input
+│       ├── index.js              # React DOM entry point — mounts App into index.html
 │       ├── components/
-│       │   ├── ChatInput.jsx     # Text input + submit button
-│       │   ├── MessageList.jsx   # Renders conversation history
-│       │   └── CompoundCard.jsx  # Displays one compound result + RDKit.js molecule
+│       │   ├── ChatInput.jsx     # Controlled text input + submit button; calls onSubmit prop on submit
+│       │   ├── MessageList.jsx   # Maps messages array to chat bubbles; renders CompoundCards per message
+│       │   └── CompoundCard.jsx  # Displays one compound: name, ChEMBL ID, pChEMBL, IC50, phase, SMILES
 │       └── services/
-│           └── api.js            # fetch() calls to Express backend
+│           └── api.js            # postQuery(message, history) — fetch() POST to API Gateway (Phase 3) or /query proxy (local)
 │
 └── tests/
     ├── unit/
-    │   ├── queries.test.js       # Unit tests for MongoDB query functions
-    │   └── handlers.test.js      # Unit tests for MCP tool handlers
+    │   ├── queries.test.js       # 8 unit tests for db/queries.js (mocks Mongoose model)
+    │   └── handlers.test.js      # 6 unit tests for mcp/handlers.js (mocks query functions)
     └── integration/
-        └── flow.test.js          # End-to-end query flow tests
+        └── flow.test.js          # 6 test.todo() placeholders for end-to-end flow tests (Step 9)
 ```
 
 ---
@@ -349,6 +347,91 @@ Check off steps as completed. Do not start Phase 2 until all Phase 1 steps are c
 - [ ] 9.3 Manually run all 5 demo tests from Section 11 (DM-01 through DM-05) in the browser (~5 min)
 - [ ] 9.4 Write README.md — project description, how to install, how to run locally, what the demo does (~5 min)
 - [ ] 9.5 Final commit: "Phase 1 complete: end-to-end demo working" (~2 min)
+
+#### Step 10 — Dynamic query_compounds Tool (~60 min)
+
+**Goal:** Replace the 3 rigid Phase 1 tools (search_by_target, filter_by_affinity, get_compound_details)
+with a single `query_compounds` tool that Claude can use to answer any compound question by building
+a filter object dynamically. Unlocks range queries, multi-field filtering, sorting, and any target string.
+
+**Architecture change:**
+- Phase 1: 3 tools with hardcoded enums → Claude picks one → one query function called
+- Phase 10: 1 tool → Claude builds a filter object → one dynamic query function translates it to MongoDB
+
+##### 10.1 — Define the new tool in src/mcp/tools.js (~10 min)
+Replace the 3 existing tool definitions with a single `query_compounds` tool:
+```js
+{
+  name: "query_compounds",
+  description: "Query the compounds database with any combination of filters. Use for any question about compounds — searching by target, filtering by potency, molecular weight, approval phase, or any other property.",
+  input_schema: {
+    type: "object",
+    properties: {
+      filters: {
+        type: "object",
+        description: "Filter criteria. Each field accepts a direct value (string/boolean) or a range object { min, max }",
+        properties: {
+          target_protein:  { type: "string",  description: "Target protein name e.g. PPARG or AR" },
+          pchembl_value:   { type: "object",  description: "Potency range e.g. { min: 7.0, max: 9.0 }" },
+          mol_weight:      { type: "object",  description: "Molecular weight range in Da e.g. { max: 500 }" },
+          max_phase:       { type: "object",  description: "Clinical phase range e.g. { min: 3 } for late-stage" },
+          withdrawn_flag:  { type: "boolean", description: "true = withdrawn only, false = exclude withdrawn" },
+          alogp:           { type: "object",  description: "Lipophilicity range e.g. { min: 0, max: 5 }" },
+          hbd:             { type: "object",  description: "Hydrogen bond donor count range" },
+          hba:             { type: "object",  description: "Hydrogen bond acceptor count range" },
+          chembl_id:       { type: "string",  description: "Exact ChEMBL ID lookup e.g. CHEMBL121" }
+        }
+      },
+      sort_by:    { type: "string",  description: "Field to sort by e.g. pchembl_value" },
+      sort_order: { type: "string",  enum: ["asc", "desc"], description: "Sort direction" },
+      limit:      { type: "number",  description: "Max results to return, default 20" }
+    },
+    required: []
+  }
+}
+```
+
+##### 10.2 — Write queryCompounds() in src/db/queries.js (~15 min)
+Add a new query function that translates the filter object Claude builds into a MongoDB query dynamically.
+Keep the 3 existing query functions — do not delete them (unit tests still use them).
+```js
+async function queryCompounds(filters = {}, sortBy, sortOrder, limit) {
+  const query = {}
+  // Loop over each filter field and build $gte/$lte/$eq conditions dynamically
+  // String/boolean fields → direct equality match
+  // Object fields with min/max → $gte / $lte
+  // chembl_id → findOne shortcut
+}
+```
+
+##### 10.3 — Write queryCompoundsHandler() in src/mcp/handlers.js (~10 min)
+Add a new handler that calls queryCompounds() with Claude's input.
+Keep the 3 existing handlers — do not delete them (unit tests still use them).
+
+##### 10.4 — Update dispatchTool() in server.js (~5 min)
+Add a new `if` branch for `query_compounds` alongside the existing 3 branches.
+Do not remove the existing branches yet — keep them until tests are updated.
+
+##### 10.5 — Write unit tests for queryCompounds() in tests/unit/queries.test.js (~10 min)
+Add tests QU-09 through QU-12:
+- QU-09: string field filter (target_protein)
+- QU-10: range filter with min only (pchembl_value: { min: 7 })
+- QU-11: range filter with min and max (mol_weight: { min: 200, max: 500 })
+- QU-12: boolean filter (withdrawn_flag: false)
+
+##### 10.6 — Write unit tests for queryCompoundsHandler() in tests/unit/handlers.test.js (~5 min)
+Add tests HU-05 and HU-06:
+- HU-05: successful query returns { compounds }
+- HU-06: DB error returns { compounds: [], error }
+
+##### 10.7 — Run npm test — all tests must pass (~5 min)
+
+##### 10.8 — Manual browser test — verify these queries work end-to-end (~5 min)
+- "Show me approved non-withdrawn AR compounds" → max_phase ≥ 4, withdrawn_flag: false
+- "Show compounds with pChEMBL between 6 and 7" → pchembl_value: { min: 6, max: 7 }
+- "What are the most drug-like compounds?" → mol_weight: { max: 500 }, sort by qed_weighted desc
+
+##### 10.9 — Commit: "Step 10: dynamic query_compounds tool replacing rigid Phase 1 tools" (~2 min)
 
 ---
 

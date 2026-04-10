@@ -1,11 +1,11 @@
-// Unit tests for the three MCP handler functions in src/mcp/handlers.js.
+// Unit tests for all MCP handler functions in src/mcp/handlers.js.
 // The query functions (src/db/queries.js) are mocked so these tests verify handler
 // behavior in isolation — input shaping, output wrapping, and error handling — without
 // touching the database.
 
 jest.mock('../../src/db/queries')
-const { getCompoundsByTarget, getCompoundsByAffinity, getCompoundById } = require('../../src/db/queries')
-const { searchByTarget, filterByAffinity, getCompoundDetails } = require('../../src/mcp/handlers')
+const { getCompoundsByTarget, getCompoundsByAffinity, getCompoundById, queryCompounds } = require('../../src/db/queries')
+const { searchByTarget, filterByAffinity, getCompoundDetails, queryCompoundsHandler } = require('../../src/mcp/handlers')
 
 // ---------------------------------------------------------------------------
 // Shared fake data
@@ -110,5 +110,50 @@ describe('getCompoundDetails', () => {
     expect(result.compound).toBeNull()
     // error must be present so Claude can generate a "not found" message for the user
     expect(result.error).toBe('Compound not found')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// queryCompoundsHandler
+// ---------------------------------------------------------------------------
+
+describe('queryCompoundsHandler', () => {
+  // HU-05: successful query returns { compounds } array
+  it('HU-05: returns { compounds: [...] } for a valid filter object', async () => {
+    const fakeResults = [
+      { chembl_id: 'CHEMBL121', pchembl_value: 6.60, withdrawn_flag: false }
+    ]
+    // queryCompounds is the underlying DB function — mock it to return fake results
+    queryCompounds.mockResolvedValue(fakeResults)
+
+    const result = await queryCompoundsHandler({
+      filters:     { target_protein: 'PPARG', pchembl_value: { min: 6.0 } },
+      sort_by:     'pchembl_value',
+      sort_order:  'desc',
+      limit:       10
+    })
+
+    expect(result).toHaveProperty('compounds')
+    expect(Array.isArray(result.compounds)).toBe(true)
+    expect(result.compounds.length).toBe(1)
+    expect(result.error).toBeUndefined()
+    // Verify queryCompounds was called with the correct arguments from Claude's input
+    expect(queryCompounds).toHaveBeenCalledWith(
+      { target_protein: 'PPARG', pchembl_value: { min: 6.0 } },
+      'pchembl_value',
+      'desc',
+      10
+    )
+  })
+
+  // HU-06: DB error returns { compounds: [], error } without throwing
+  it('HU-06: returns { compounds: [], error } if queryCompounds throws', async () => {
+    queryCompounds.mockRejectedValue(new Error('Atlas unreachable'))
+
+    const result = await queryCompoundsHandler({ filters: { target_protein: 'AR' } })
+
+    // Structured error — same pattern as all other handlers, never propagates the throw
+    expect(result.compounds).toEqual([])
+    expect(result.error).toBe('Atlas unreachable')
   })
 })

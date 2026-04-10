@@ -1,7 +1,7 @@
 // This file contains the MCP tool handler functions — one per tool defined in tools.js.
 // Each handler is called by server.js when Claude triggers a tool call, and is responsible for calling the correct query function and returning a consistently shaped result.
 
-const { getCompoundsByTarget, getCompoundsByAffinity, getCompoundById } = require('../db/queries')
+const { getCompoundsByTarget, getCompoundsByAffinity, getCompoundById, queryCompounds } = require('../db/queries')
 
 /**
  * @description MCP handler for the search_by_target tool. Receives Claude's tool input,
@@ -18,15 +18,13 @@ const { getCompoundsByTarget, getCompoundsByAffinity, getCompoundById } = requir
 async function searchByTarget(input) {
   try {
     // Call the query function with the target protein Claude extracted from the user's message.
-    // input.target is guaranteed to be "PPARG" or "AR" — Claude enforces the enum in tools.js.
     const compounds = await getCompoundsByTarget(input.target)
 
     // Wrap in { compounds } so server.js and the frontend always receive the same shape
-    // regardless of which tool was called.
     return { compounds }
   } catch (err) {
     // Return structured error — never throw. Caller expects { compounds } shape always.
-    return { compounds: [], error: err.message }
+    return { compounds: [], error: err.message } //Error is passed to Claude who can explain it to the user
   }
 }
 
@@ -82,4 +80,34 @@ async function getCompoundDetails(input) {
   }
 }
 
-module.exports = { searchByTarget, filterByAffinity, getCompoundDetails }
+/**
+ * queryCompoundsHandler — MCP handler for the query_compounds tool.
+ *
+ * @description Receives Claude's dynamically built filter object and passes it to
+ *   queryCompounds() in db/queries.js. This handler supports range queries, multi-field
+ *   filtering, and sorting — capabilities not available in the 3 original handlers.
+ * @calledBy server.js dispatchTool()
+ * @calls queryCompounds() in src/db/queries.js
+ * @param {object} input              Claude's tool input object
+ * @param {object} input.filters      Filter criteria — see tools.js query_compounds input_schema
+ * @param {string} input.sort_by      Optional field to sort by
+ * @param {string} input.sort_order   Optional "asc" or "desc"
+ * @param {number} input.limit        Optional max results
+ * @returns {Promise<{ compounds: Array }>} Matching compounds, or { compounds: [], error } on failure
+ * @errorHandling Structured error return — same rationale as all other handlers. Never throws.
+ */
+async function queryCompoundsHandler(input) {
+  try {
+    const compounds = await queryCompounds(
+      input.filters   || {},       // filter object Claude built — default to no filters
+      input.sort_by,               // optional sort field
+      input.sort_order || 'desc',  // default descending so highest values appear first
+      input.limit      || 20       // default 20 results if Claude didn't specify
+    )
+    return { compounds }
+  } catch (err) {
+    return { compounds: [], error: err.message }
+  }
+}
+
+module.exports = { searchByTarget, filterByAffinity, getCompoundDetails, queryCompoundsHandler }
